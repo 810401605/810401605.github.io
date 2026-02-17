@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WzAstro - Ink Divination</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@300;400;700&family=Great+Vibes&display=swap" rel="stylesheet">
+    
+    <!-- React & ReactDOM (UMD) -->
+    <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <!-- Framer Motion (UMD) -->
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    
+    <!-- Lucide React (UMD) - Using version 0.263.1 for stable UMD support -->
+    <script src="https://unpkg.com/lucide-react@0.263.1/dist/umd/lucide-react.min.js"></script>
+
+    <!-- Babel Standalone -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+      body {
+        font-family: 'Noto Serif SC', serif;
+        background-color: #f2f2f2;
+        overflow-x: hidden;
+        transition: background-color 2s ease;
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="black" opacity="0.6"/></svg>') 8 8, auto;
+      }
+      
+      /* Rice Paper Texture Overlay */
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: -2;
+        opacity: 0.5;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.5'/%3E%3C/svg%3E");
+      }
+
+      /* Hover cursor */
+      a, button, input, textarea, .cursor-pointer {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="transparent" stroke="black" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="black"/></svg>') 12 12, pointer !important;
+      }
+
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: #e0e0e0; }
+      ::-webkit-scrollbar-thumb { background: #888; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #555; }
+      
+      .font-ink { font-family: 'Ma Shan Zheng', cursive; }
+      .font-serif-en { font-family: 'Cinzel', serif; }
+      .font-flowery { font-family: 'Great Vibes', cursive; }
+      
+      .text-shadow-white { text-shadow: 0 0 10px rgba(255,255,255,0.3); }
+
+      @keyframes morph {
+        0% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+        50% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+        100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+      }
+      .ink-blob { animation: morph 8s ease-in-out infinite; }
+      
+      .universe-bg {
+        background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "framer-motion": "https://esm.sh/framer-motion@^12.34.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.567.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useRef } = React;
+      const { createRoot } = ReactDOM;
+
+      // --- Global Safety Checks ---
+      const Motion = window.Motion;
+      // Lucide v0.263.1 exposes 'lucideReact' globally
+      const Lucide = window.lucideReact;
+
+      if (!Motion) console.error("Framer Motion not loaded");
+      if (!Lucide) console.error("Lucide React not loaded");
+
+      const { motion, AnimatePresence } = Motion || { motion: { div: 'div', img: 'img', button: 'button' }, AnimatePresence: ({children}) => <>{children}</> };
+      
+      const FallbackIcon = () => <span>•</span>;
+      const { 
+        History = FallbackIcon, 
+        Sparkles = FallbackIcon, 
+        DownloadCloud = FallbackIcon, 
+        Feather = FallbackIcon, 
+        RefreshCw = FallbackIcon, 
+        X = FallbackIcon, 
+        Trash2 = FallbackIcon, 
+        Clock = FallbackIcon, 
+        ChevronRight = FallbackIcon 
+      } = Lucide || {};
+
+      // --- Types & Constants ---
+      const LAYERS = ['asc', 'mn', 'su', 'mu', 've', 'ma', 'ju', 'sa', 'ur', 'ne', 'pl'];
+      
+      // Point to local folder for assets
+      const API_DOMAIN = ""; 
+      const ASSET_PATH = "./assets/";
+
+      // --- Services ---
+      const getAssetUrl = (layer, index) => {
+        return `${API_DOMAIN}${ASSET_PATH}${layer}${index}.png`;
+      };
+
+      const cacheAllAssets = async (onProgress) => {
+        const cacheName = 'flastro-assets-v1';
+        // Open cache
+        try {
+          const cache = await caches.open(cacheName);
+          const urlsToCache = [];
+          LAYERS.forEach(layer => {
+            for (let i = 1; i <= 12; i++) {
+              urlsToCache.push(getAssetUrl(layer, i));
+            }
+          });
+
+          const total = urlsToCache.length;
+          let completed = 0;
+          const batchSize = 5;
+          
+          for (let i = 0; i < total; i += batchSize) {
+            const batch = urlsToCache.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (url) => {
+              try {
+                const match = await cache.match(url);
+                if (!match) {
+                  await cache.add(url);
+                }
+              } catch (e) {
+                console.error(`Failed to cache ${url}`, e);
+              } finally {
+                completed++;
+                if(onProgress) onProgress(Math.round((completed / total) * 100));
+              }
+            }));
+          }
+        } catch(e) {
+          console.error("Cache API not supported or failed", e);
+        }
+      };
+
+      // --- Components ---
+
+      // 1. Watermark
+      const Watermark = () => {
+        return (
+          <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden opacity-[0.04] select-none">
+            <div className="w-full h-full grid grid-cols-6 grid-rows-6 gap-8 p-10">
+              {Array.from({ length: 36 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-center transform -rotate-12">
+                  <span className="font-serif-en text-xl font-bold text-black whitespace-nowrap">WzAstro</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      };
+
+      // 2. InkEffects
+      class Particle {
+        constructor(x, y) {
+          this.x = x;
+          this.y = y;
+          this.size = Math.random() * 8 + 2;
+          this.speedX = Math.random() * 1 - 0.5;
+          this.speedY = Math.random() * 1 - 0.5;
+          const gray = Math.floor(Math.random() * 50);
+          this.color = `rgba(${gray}, ${gray}, ${gray},`;
+          this.life = 1.0;
+        }
+        update() {
+          this.x += this.speedX;
+          this.y += this.speedY;
+          if (this.size > 0.2) this.size -= 0.1;
+          this.life -= 0.02;
+        }
+        draw(ctx) {
+          ctx.fillStyle = this.color + (this.life * 0.5) + ')';
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      const InkEffects = () => {
+        const canvasRef = useRef(null);
+        const particles = useRef([]);
+
+        useEffect(() => {
+          const canvas = canvasRef.current;
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+          
+          const resize = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+          };
+          window.addEventListener('resize', resize);
+          resize();
+
+          const handleMouseMove = (e) => {
+            for(let i = 0; i < 2; i++) {
+              particles.current.push(new Particle(e.x, e.y));
+            }
+          };
+          window.addEventListener('mousemove', handleMouseMove);
+
+          const animate = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < particles.current.length; i++) {
+              particles.current[i].update();
+              particles.current[i].draw(ctx);
+              if (particles.current[i].life <= 0) {
+                particles.current.splice(i, 1);
+                i--;
+              }
+            }
+            requestAnimationFrame(animate);
+          };
+          animate();
+
+          return () => {
+            window.removeEventListener('resize', resize);
+            window.removeEventListener('mousemove', handleMouseMove);
+          };
+        }, []);
+
+        return <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-[2]" />;
+      };
+
+      // 3. InkLandscape
+      const InkLandscape = () => {
+        return (
+          <div className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden flex flex-col justify-end">
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-gray-100/20 to-gray-200/50" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 2 }} className="absolute bottom-0 left-0 right-0 h-[40vh] opacity-30">
+               <svg viewBox="0 0 1440 320" className="w-full h-full object-cover" preserveAspectRatio="none">
+                 <path fill="#9ca3af" fillOpacity="0.5" d="M0,224L48,213.3C96,203,192,181,288,181.3C384,181,480,203,576,224C672,245,768,267,864,261.3C960,256,1056,224,1152,197.3C1248,171,1344,149,1392,138.7L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+               </svg>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 2.5, delay: 0.2 }} className="absolute bottom-0 left-0 right-0 h-[35vh] opacity-40 mix-blend-multiply">
+               <svg viewBox="0 0 1440 320" className="w-full h-full object-cover" preserveAspectRatio="none">
+                 <filter id="blurFilter2"><feGaussianBlur in="SourceGraphic" stdDeviation="2" /></filter>
+                 <path filter="url(#blurFilter2)" fill="#6b7280" fillOpacity="0.6" d="M0,192L60,197.3C120,203,240,213,360,202.7C480,192,600,160,720,165.3C840,171,960,213,1080,224C1200,235,1320,213,1380,202.7L1440,192L1440,320L1380,320C1320,320,1200,320,1080,320C960,320,840,320,720,320C600,320,480,320,360,320C240,320,120,320,60,320L0,320Z"></path>
+               </svg>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 3, delay: 0.4 }} className="absolute bottom-0 left-0 right-0 h-[30vh] opacity-60 mix-blend-multiply">
+               <svg viewBox="0 0 1440 320" className="w-full h-full object-cover" preserveAspectRatio="none">
+                 <filter id="inkBlur"><feGaussianBlur in="SourceGraphic" stdDeviation="3" /><feTurbulence type="fractalNoise" baseFrequency="0.01" numOctaves="3" result="noise" /><feDisplacementMap in="SourceGraphic" in2="noise" scale="5" /></filter>
+                 <path filter="url(#inkBlur)" fill="#374151" fillOpacity="0.8" d="M0,160L48,176C96,192,192,224,288,229.3C384,235,480,213,576,192C672,171,768,149,864,160C960,171,1056,213,1152,229.3C1248,245,1344,235,1392,229.3L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+               </svg>
+            </motion.div>
+          </div>
+        );
+      };
+
+      // 4. InkUniverse
+      const InkUniverse = () => {
+         const canvasRef = useRef(null);
+         
+         useEffect(() => {
+           const canvas = canvasRef.current;
+           if (!canvas) return;
+           const ctx = canvas.getContext('2d');
+           
+           let width, height;
+           let stars = [];
+           let inkBlobs = [];
+           
+           const resize = () => {
+             width = window.innerWidth;
+             height = window.innerHeight;
+             canvas.width = width;
+             canvas.height = height;
+           };
+           
+           const init = () => {
+             resize();
+             stars = [];
+             for(let i=0; i<150; i++) {
+               stars.push({
+                 x: Math.random() * width,
+                 y: Math.random() * height,
+                 size: Math.random() * 2,
+                 alpha: Math.random(),
+                 speed: Math.random() * 0.05
+               });
+             }
+             
+             inkBlobs = [];
+             for(let i=0; i<5; i++) {
+               inkBlobs.push({
+                  x: Math.random() * width,
+                  y: Math.random() * height,
+                  size: 200 + Math.random() * 300,
+                  alpha: 0,
+                  targetAlpha: 0.1 + Math.random() * 0.2
+               });
+             }
+           };
+
+           const animate = () => {
+             ctx.clearRect(0,0,width,height);
+             
+             ctx.fillStyle = 'rgba(10, 10, 15, 0.2)';
+             ctx.fillRect(0,0,width,height);
+             
+             inkBlobs.forEach(blob => {
+                if (blob.alpha < blob.targetAlpha) blob.alpha += 0.001;
+                const gradient = ctx.createRadialGradient(blob.x, blob.y, 0, blob.x, blob.y, blob.size);
+                gradient.addColorStop(0, `rgba(20, 25, 40, ${blob.alpha})`);
+                gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(blob.x, blob.y, blob.size, 0, Math.PI*2);
+                ctx.fill();
+             });
+
+             ctx.fillStyle = 'white';
+             stars.forEach(star => {
+               star.alpha += (Math.random() - 0.5) * 0.02;
+               if (star.alpha < 0) star.alpha = 0;
+               if (star.alpha > 1) star.alpha = 1;
+               
+               star.y -= star.speed;
+               if (star.y < 0) star.y = height;
+               
+               ctx.globalAlpha = star.alpha;
+               ctx.beginPath();
+               ctx.arc(star.x, star.y, star.size, 0, Math.PI*2);
+               ctx.fill();
+             });
+             ctx.globalAlpha = 1;
+
+             requestAnimationFrame(animate);
+           };
+
+           window.addEventListener('resize', resize);
+           init();
+           animate();
+
+           return () => window.removeEventListener('resize', resize);
+         }, []);
+
+         return (
+            <div className="fixed inset-0 pointer-events-none z-[-1] universe-bg">
+               <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+            </div>
+         );
+      };
+
+      // 5. InkButton
+      const InkButton = ({ children, variant = 'primary', icon, className = '', ...props }) => {
+        const baseStyles = "relative px-6 py-2 rounded-lg font-serif-en tracking-wider overflow-hidden transition-all duration-300 flex items-center justify-center gap-2 group cursor-pointer";
+        const variants = {
+          primary: "bg-gray-900 text-white hover:bg-gray-800 border border-gray-900 shadow-lg hover:shadow-gray-500/30",
+          secondary: "bg-transparent text-gray-800 border border-gray-800 hover:bg-gray-100",
+          danger: "bg-red-50 text-red-800 border border-red-200 hover:bg-red-100"
+        };
+        // Check for dark mode if we needed it, but here we rely on context
+        
+        return (
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className={`${baseStyles} ${variants[variant]} ${className}`} {...props}>
+            <span className="relative z-10 flex items-center gap-2">{icon}{children}</span>
+            <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
+          </motion.button>
+        );
+      };
+
+      // 6. AstrologyChart
+      const AstrologyChart = ({ data, label, mode = 'light' }) => {
+        const isDark = mode === 'dark';
+        
+        const blob1Style = isDark ? "bg-white/10 blur-xl" : "bg-gray-900/5 blur-xl";
+        const blob2Style = isDark ? "bg-white/20" : "bg-gray-800/10";
+        const borderStyle = isDark ? "border-white/20" : "border-gray-900/20";
+        const labelColor = isDark ? "text-white text-shadow-white" : "text-gray-900";
+        const barColor = isDark ? "bg-white" : "bg-gray-900";
+
+        return (
+          <div className="flex flex-col items-center group">
+            <div className="relative w-72 h-72 md:w-96 md:h-96">
+              
+              <div className={`absolute -inset-4 rounded-[40%] ink-blob animate-pulse pointer-events-none ${blob1Style}`}></div>
+              <div className={`absolute -inset-2 rounded-[50%] ink-blob pointer-events-none ${blob2Style}`} style={{ animationDuration: '10s' }}></div>
+              <div className={`absolute -inset-1 border-2 rounded-[45%] ink-blob pointer-events-none ${borderStyle}`} style={{ animationDuration: '15s', animationDirection: 'reverse' }}></div>
+              
+              <div className="relative w-full h-full rounded-full bg-[#fdfbf7] shadow-2xl overflow-hidden border-4 border-double border-gray-300 z-10 transition-transform duration-700 group-hover:scale-[1.02]">
+                   <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23000000' fill-opacity='1' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='1'/%3E%3Ccircle cx='13' cy='13' r='1'/%3E%3C/g%3E%3C/svg%3E")` }}></div>
+                   {LAYERS.map((layer, index) => (
+                    <motion.img
+                      key={layer}
+                      src={getAssetUrl(layer, data[layer])}
+                      alt={layer}
+                      className="absolute top-0 left-0 w-full h-full object-contain mix-blend-multiply"
+                      style={{ zIndex: index + 1 }}
+                      initial={{ opacity: 0, rotate: -20, scale: 1.2 }}
+                      animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                      transition={{ duration: 1.5, delay: index * 0.15, ease: [0.16, 1, 0.3, 1] }}
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  ))}
+                   <div className="absolute inset-4 rounded-full border border-dashed border-gray-400 opacity-30 pointer-events-none" />
+              </div>
+            </div>
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.8 }} className="mt-8 text-center relative z-20">
+              <span className={`font-flowery text-4xl md:text-5xl tracking-wider block drop-shadow-sm ${labelColor}`}>{label}</span>
+              <div className={`w-8 h-1 mx-auto mt-2 rounded-full opacity-50 ${barColor}`}></div>
+            </motion.div>
+          </div>
+        );
+      };
+
+      // 7. HistorySidebar
+      const HistorySidebar = ({ isOpen, onClose, history, onSelect, onDelete, onClear }) => {
+        return (
+          <AnimatePresence>
+            {isOpen && (
+              <>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" />
+                <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="fixed right-0 top-0 bottom-0 w-full sm:w-96 bg-[#f8f6f2] shadow-2xl z-50 flex flex-col border-l border-gray-200">
+                  <div className="p-6 border-b border-gray-200 flex items-center justify-between bg-white/50">
+                    <h2 className="font-serif-en text-xl text-gray-800 flex items-center gap-2"><Clock className="w-5 h-5" /> History</h2>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full transition-colors cursor-pointer"><X className="w-5 h-5 text-gray-600" /></button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {history.length === 0 ? (
+                      <div className="text-center text-gray-400 mt-20 font-serif-en text-lg">No History Yet</div>
+                    ) : (
+                      history.map((item) => (
+                        <motion.div key={item.id} layout initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="group bg-white p-4 rounded-lg border border-gray-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden">
+                          <div className="absolute inset-0 z-0 cursor-pointer" onClick={() => onSelect(item)} />
+                          <div className="relative z-10 flex justify-between items-start mb-2 pointer-events-none">
+                            <span className="text-xs font-mono text-gray-400">{new Date(item.timestamp).toLocaleString()}</span>
+                            <button onClick={(e) => { e.stopPropagation(); onDelete(item.id); }} className="pointer-events-auto p-2 -mr-2 -mt-2 rounded-full text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors z-20 cursor-pointer" title="Delete Record"><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                          <div className="relative z-0 pointer-events-none">
+                              <h3 className="font-medium text-gray-800 line-clamp-2 pr-4 font-serif-en">{item.question}</h3>
+                              <div className="mt-3 flex items-center text-sm text-purple-900 font-medium opacity-0 group-hover:opacity-100 transition-opacity font-serif-en">View Chart <ChevronRight className="w-4 h-4 ml-1" /></div>
+                          </div>
+                        </motion.div>
+                      ))
+                    )}
+                  </div>
+                  <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+                    <span className="text-xs text-gray-400 font-mono">WzAstro Storage</span>
+                    {history.length > 0 && (
+                       <button onClick={onClear} className="text-xs text-red-500 hover:text-red-700 font-serif-en flex items-center gap-1 transition-colors px-2 py-1 rounded hover:bg-red-50 cursor-pointer"><Trash2 className="w-3 h-3" /> Clear All</button>
+                    )}
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        );
+      };
+
+      // 8. App
+      const getRandomInt = () => Math.floor(Math.random() * 12) + 1;
+      const generateRandomChart = () => {
+        const chart = {};
+        LAYERS.forEach(layer => { chart[layer] = getRandomInt(); });
+        return chart;
+      };
+
+      const App = () => {
+        const [question, setQuestion] = useState('');
+        const [isSidebarOpen, setSidebarOpen] = useState(false);
+        const [currentResult, setCurrentResult] = useState(null);
+        const [history, setHistory] = useState([]);
+        const [isGenerating, setIsGenerating] = useState(false);
+        const [cachingProgress, setCachingProgress] = useState(0);
+        const [isCaching, setIsCaching] = useState(false);
+
+        useEffect(() => {
+          const saved = localStorage.getItem('flastro_history'); 
+          if (saved) {
+            try { setHistory(JSON.parse(saved)); } catch (e) { console.error("Failed to load history", e); }
+          }
+        }, []);
+
+        useEffect(() => {
+          localStorage.setItem('flastro_history', JSON.stringify(history));
+        }, [history]);
+
+        const handleGenerate = () => {
+          const finalQuestion = question.trim() ? question : new Date().toLocaleString();
+          setIsGenerating(true);
+          setTimeout(() => {
+            const newResult = {
+              id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+              timestamp: Date.now(),
+              question: finalQuestion,
+              chart1: generateRandomChart(),
+              chart2: generateRandomChart()
+            };
+            setCurrentResult(newResult);
+            setHistory(prev => [newResult, ...prev]);
+            setIsGenerating(false);
+          }, 2000);
+        };
+
+        const handleCacheAssets = async () => {
+            setIsCaching(true);
+            setCachingProgress(0);
+            try {
+              await cacheAllAssets((progress) => {
+                setCachingProgress(progress);
+              });
+              alert("Resources cached successfully! You can now use this offline.");
+            } catch (error) {
+              alert("Failed to cache resources.");
+            } finally {
+              setIsCaching(false);
+            }
+        };
+
+        const handleDeleteHistory = (id) => {
+          if (window.confirm("Delete this record?")) {
+            setHistory(prev => prev.filter(item => item.id !== id));
+            if (currentResult?.id === id) {
+              setCurrentResult(null);
+              setQuestion('');
+            }
+          }
+        };
+
+        const handleClearHistory = () => {
+          if (history.length === 0) return;
+          if (window.confirm("Delete all history records? This cannot be undone.")) {
+            setHistory([]);
+            setCurrentResult(null);
+            setQuestion('');
+          }
+        };
+
+        const handleSelectHistory = (item) => {
+          setCurrentResult(item);
+          setQuestion(item.question);
+          setSidebarOpen(false);
+        };
+
+        const handleReset = () => {
+          setCurrentResult(null);
+          setQuestion('');
+        };
+
+        const isDivinationActive = !!currentResult;
+
+        return (
+          <div className={`min-h-screen relative flex flex-col items-center overflow-x-hidden ${isDivinationActive ? 'text-gray-200' : 'text-gray-900'}`}>
+            <Watermark />
+            
+            {/* Background Transitions */}
+            <AnimatePresence>
+               {!isDivinationActive && <motion.div key="land" initial={{opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}} className="absolute inset-0 z-[-1]"><InkLandscape /></motion.div>}
+               {isDivinationActive && <motion.div key="universe" initial={{opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}} className="absolute inset-0 z-[-1]"><InkUniverse /></motion.div>}
+            </AnimatePresence>
+            
+            <InkEffects />
+            
+            <nav className="w-full p-6 flex justify-between items-center z-20 relative">
+              <div className="flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-serif-en font-bold text-lg border-2 shadow-xl transition-colors duration-1000 ${isDivinationActive ? 'bg-white text-black border-white' : 'bg-gray-900 text-white border-gray-700'}`}>Wz</div>
+                <h1 className={`text-2xl font-serif-en font-bold tracking-widest hidden md:block transition-colors duration-1000 ${isDivinationActive ? 'text-white' : 'text-gray-900'}`}>WzAstro</h1>
+              </div>
+              <div className="flex items-center gap-4">
+                <button 
+                    onClick={handleCacheAssets} 
+                    disabled={isCaching}
+                    className={`hidden md:flex items-center gap-2 text-sm transition-colors cursor-pointer ${isDivinationActive ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    title="Download offline resources"
+                >
+                    {isCaching ? (
+                    <span className="font-mono">{cachingProgress}%</span>
+                    ) : (
+                    <>
+                        <DownloadCloud className="w-4 h-4" />
+                        <span className="font-serif-en">Offline Mode</span>
+                    </>
+                    )}
+                </button>
+                <InkButton variant="secondary" onClick={() => setSidebarOpen(true)} className={isDivinationActive ? 'text-white border-white hover:bg-white/10' : ''} icon={<History className="w-4 h-4" />}>History</InkButton>
+              </div>
+            </nav>
+
+            <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-8 z-10 flex flex-col relative">
+              <AnimatePresence mode="wait">
+                {!currentResult && !isGenerating ? (
+                  <motion.div key="input" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="flex-1 flex flex-col items-center justify-center min-h-[50vh]">
+                    <div className="text-center mb-10">
+                      <h2 className="text-5xl md:text-7xl font-serif-en text-gray-900 mb-4 drop-shadow-sm tracking-tight">Divination</h2>
+                      <p className="font-ink text-3xl md:text-4xl text-gray-600 tracking-wide">星盘流转 · 问心求索</p>
+                    </div>
+                    <div className="w-full max-w-xl relative group">
+                      <div className="absolute -inset-1 bg-gradient-to-r from-gray-200 via-gray-400 to-gray-200 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+                      <div className="relative bg-white/60 backdrop-blur-md rounded-lg p-1 shadow-lg border border-gray-200/50">
+                        <textarea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Enter your question (optional)..." className="w-full h-32 p-4 bg-transparent border-none focus:ring-0 text-center text-lg text-gray-800 font-serif-en resize-none placeholder:text-gray-500" />
+                        <div className="flex justify-center pb-4"><InkButton onClick={handleGenerate} icon={<Sparkles className="w-4 h-4" />}>Generate</InkButton></div>
+                      </div>
+                    </div>
+                    <div className="mt-8 md:hidden text-center">
+                        <button 
+                            onClick={handleCacheAssets} 
+                            disabled={isCaching}
+                            className="text-xs text-gray-400 underline font-serif-en"
+                        >
+                            {isCaching ? `Downloading... ${cachingProgress}%` : "Download Offline Assets"}
+                        </button>
+                    </div>
+                  </motion.div>
+                ) : isGenerating ? (
+                  <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex-1 flex flex-col items-center justify-center">
+                    <div className="relative w-24 h-24">
+                      <div className="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
+                      <div className="absolute inset-0 border-4 border-gray-900 rounded-full border-t-transparent animate-spin"></div>
+                    </div>
+                    <p className="mt-8 font-serif-en text-xl animate-pulse text-gray-700 tracking-widest">Divining...</p>
+                  </motion.div>
+                ) : (
+                  <motion.div key="result" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full">
+                    <div className="text-center mb-12 relative">
+                      <div className="inline-block relative bg-white/10 backdrop-blur-md rounded-lg shadow-sm border border-white/20">
+                         <h2 className="text-2xl md:text-3xl font-serif-en font-bold text-white px-8 py-4 border-b border-white/20">{currentResult?.question}</h2>
+                         <div className="text-sm font-mono text-gray-300 py-2">{new Date(currentResult.timestamp).toLocaleString()}</div>
+                      </div>
+                      <button onClick={handleReset} className="absolute top-0 right-0 p-2 text-gray-400 hover:text-white transition-colors cursor-pointer" title="New Divination"><RefreshCw className="w-6 h-6" /></button>
+                    </div>
+                    
+                    {/* Charts Area - Using Dark Mode prop */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-24 items-center justify-center">
+                      <div className="p-4">
+                         <AstrologyChart data={currentResult.chart1} label="Emotion" mode="dark" />
+                      </div>
+                      <div className="p-4">
+                         <AstrologyChart data={currentResult.chart2} label="Truth" mode="dark" />
+                      </div>
+                    </div>
+
+                    <div className="mt-16 text-center max-w-2xl mx-auto">
+                       <div className="p-6">
+                          <Feather className="w-8 h-8 text-white/80 mx-auto mb-4" />
+                          <p className="font-ink text-4xl text-white leading-loose tracking-widest text-shadow-white">星盘已成。观星如观心，万象皆由心生。</p>
+                       </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </main>
+            <footer className="w-full p-4 text-center z-10 opacity-40 text-gray-500">
+              <p className="text-xs font-serif-en">© {new Date().getFullYear()} WzAstro</p>
+            </footer>
+            <HistorySidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} history={history} onSelect={handleSelectHistory} onDelete={handleDeleteHistory} onClear={handleClearHistory} />
+          </div>
+        );
+      };
+
+      // --- Mount ---
+      const root = createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
